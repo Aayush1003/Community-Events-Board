@@ -20,6 +20,7 @@
     "zod": "^4.6.5"
   },
   "devDependencies": {
+    "@tailwindcss/postcss": "^4.3.3",
     "@tailwindcss/turbopack": "^4",
     "@types/jsonwebtoken": "^9.0.10",
     "@types/node": "^20",
@@ -27,6 +28,7 @@
     "@types/react-dom": "^19.2.0",
     "eslint": "^9",
     "eslint-config-next": "16.4.0",
+    "postcss": "^8.5.29",
     "prisma": "^5.22.0",
     "tailwindcss": "^4",
     "tsx": "^4.23.15",

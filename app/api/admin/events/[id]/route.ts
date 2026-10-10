@@ -49,3 +49,19 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
     return NextResponse.json({ error: "Unable to update event." }, { status: 500 });
   }
 }
+
+export async function DELETE(request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  const session = getSessionFromRequest(request);
+
+  if (!session || session.role !== "ADMIN") {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  try {
+    await prisma.event.delete({ where: { id } });
+    return NextResponse.json({ message: "Event deleted successfully." });
+  } catch {
+    return NextResponse.json({ error: "Unable to delete event." }, { status: 500 });
+  }
+}

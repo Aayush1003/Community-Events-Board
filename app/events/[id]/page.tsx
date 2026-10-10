@@ -2,7 +2,21 @@
 
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
-import { CalendarDays, MapPin, Tag, Sparkles } from "lucide-react";
+import {
+  CalendarDays,
+  MapPin,
+  Tag,
+  Sparkles,
+  ArrowLeft,
+  Bell,
+  Share2,
+  CalendarPlus,
+  Check,
+  CheckCircle2,
+  Smile,
+  Type,
+} from "lucide-react";
+import Link from "next/link";
 import { formatDateTime, formatPrice } from "@/lib/format";
 
 type EventDetail = {
@@ -23,39 +37,56 @@ type EventDetail = {
 };
 
 const themes = [
-  { label: "Sunset glow", value: "sunset", className: "from-orange-300 via-pink-300 to-rose-200" },
-  { label: "Ocean calm", value: "ocean", className: "from-cyan-200 via-sky-200 to-indigo-200" },
-  { label: "Forest light", value: "forest", className: "from-emerald-200 via-lime-200 to-yellow-100" },
+  { label: "Sunset Glow", value: "sunset", className: "from-orange-400 via-pink-400 to-rose-300", textColor: "text-slate-900" },
+  { label: "Ocean Breeze", value: "ocean", className: "from-cyan-300 via-sky-300 to-indigo-300", textColor: "text-slate-900" },
+  { label: "Neon Cyber", value: "cyber", className: "from-purple-900 via-indigo-900 to-slate-950", textColor: "text-purple-100" },
+  { label: "Emerald Meadow", value: "forest", className: "from-emerald-400 via-teal-300 to-lime-200", textColor: "text-slate-900" },
+  { label: "Golden Hour", value: "gold", className: "from-amber-400 via-orange-300 to-yellow-200", textColor: "text-slate-900" },
 ];
 
-const stickers = ["🎉", "🎵", "🌟", "✨", "🎈"];
+const availableStickers = ["🎉", "🎵", "🌟", "✨", "🍕", "🎸", "☕", "🎨", "🎟️", "🔥", "🚀", "🎈"];
 
 export default function EventDetailPage() {
   const params = useParams();
   const [event, setEvent] = useState<EventDetail | null>(null);
   const [theme, setTheme] = useState("sunset");
   const [selectedStickers, setSelectedStickers] = useState<string[]>([]);
+  const [customNote, setCustomNote] = useState("Can't wait for this!");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  function showToast(msg: string) {
+    setToastMessage(msg);
+    setTimeout(() => {
+      setToastMessage((c) => (c === msg ? null : c));
+    }, 3000);
+  }
 
   useEffect(() => {
     async function loadEvent() {
       const id = Array.isArray(params.id) ? params.id[0] : params.id;
 
-      const response = await fetch(`/api/events/${id}`);
-      const data = await response.json();
+      try {
+        const response = await fetch(`/api/events/${id}`, { credentials: "include" });
+        const data = await response.json();
 
-      if (!response.ok) {
-        setError(data.error || "Event not found");
+        if (!response.ok) {
+          setError(data.error || "Event not found");
+          setLoading(false);
+          return;
+        }
+
+        setEvent(data);
+        setTheme(data.cardDesign?.theme || "sunset");
+        setSelectedStickers(data.cardDesign?.stickers || []);
         setLoading(false);
-        return;
+      } catch {
+        setError("Unable to load event details.");
+        setLoading(false);
       }
-
-      setEvent(data);
-      setTheme(data.cardDesign?.theme || "sunset");
-      setSelectedStickers(data.cardDesign?.stickers || []);
-      setLoading(false);
     }
 
     void loadEvent();
@@ -63,26 +94,62 @@ export default function EventDetailPage() {
 
   async function saveDesign(nextTheme: string, nextStickers: string[]) {
     const id = Array.isArray(params.id) ? params.id[0] : params.id;
-
-    if (!id) {
-      return;
-    }
+    if (!id) return;
 
     setSaving(true);
-    const response = await fetch("/api/card-design", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        eventId: id,
-        theme: nextTheme,
-        stickers: nextStickers,
-      }),
-      credentials: "include",
-    });
-    setSaving(false);
+    try {
+      const response = await fetch("/api/card-design", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          eventId: id,
+          theme: nextTheme,
+          stickers: nextStickers,
+        }),
+        credentials: "include",
+      });
+      setSaving(false);
 
-    if (!response.ok) {
-      setError("Please log in to save your card design.");
+      if (!response.ok) {
+        showToast("Log in to save your customized card design to your profile.");
+      } else {
+        showToast("Custom card design saved!");
+      }
+    } catch {
+      setSaving(false);
+    }
+  }
+
+  async function toggleReminder() {
+    if (!event) return;
+
+    try {
+      const response = await fetch("/api/reminders", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ eventId: event.id }),
+        credentials: "include",
+      });
+
+      const data = await response.json();
+      if (!response.ok) {
+        showToast(data.error || "Please log in to set event reminders.");
+        return;
+      }
+
+      setEvent((current) => (current ? { ...current, isReminder: data.isReminder } : null));
+      showToast(data.isReminder ? "Added to your reminders!" : "Removed from reminders.");
+    } catch {
+      showToast("Unable to update reminder.");
+    }
+  }
+
+  async function handleShare() {
+    if (navigator.clipboard) {
+      await navigator.clipboard.writeText(window.location.href);
+      setCopied(true);
+      showToast("Event link copied to clipboard!");
+      setTimeout(() => setCopied(false), 2500);
     }
   }
 
@@ -92,99 +159,275 @@ export default function EventDetailPage() {
   }
 
   function handleAddSticker(emoji: string) {
-    if (selectedStickers.length >= 3) {
+    if (selectedStickers.length >= 4) {
+      showToast("Max 4 stickers on card.");
       return;
     }
-
     const next = [...selectedStickers, emoji];
     setSelectedStickers(next);
     void saveDesign(theme, next);
   }
 
-  function handleRemoveSticker(emoji: string) {
-    const next = selectedStickers.filter((item) => item !== emoji);
+  function handleRemoveSticker(index: number) {
+    const next = selectedStickers.filter((_, i) => i !== index);
     setSelectedStickers(next);
     void saveDesign(theme, next);
   }
 
+  // Google Calendar URL generator
+  function getGoogleCalendarUrl() {
+    if (!event) return "#";
+    const startDate = new Date(event.dateTime);
+    const endDate = new Date(startDate.getTime() + 2 * 60 * 60 * 1000); // 2 hours
+    const formatGDate = (d: Date) => d.toISOString().replace(/-|:|\.\d\d\d/g, "");
+    const title = encodeURIComponent(event.title);
+    const details = encodeURIComponent(
+      `${event.description}\n\nCity: ${event.city}\nPrice: ${formatPrice(event.price)}`
+    );
+    const location = encodeURIComponent(event.city);
+    return `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${title}&details=${details}&location=${location}&dates=${formatGDate(
+      startDate
+    )}/${formatGDate(endDate)}`;
+  }
+
   if (loading) {
-    return <div className="text-center text-slate-600">Loading event...</div>;
+    return (
+      <div className="detail-layout">
+        <div className="shimmer h-[620px] rounded-3xl" />
+        <div className="shimmer h-[520px] rounded-3xl" />
+      </div>
+    );
   }
 
   if (!event) {
-    return <div className="rounded-2xl bg-red-50 p-6 text-red-700">{error || "Event not found."}</div>;
+    return (
+      <div className="glass-card rounded-2xl p-12 text-center max-w-lg mx-auto">
+        <p className="text-lg font-semibold text-rose-300">{error || "Event not found."}</p>
+        <Link href="/events" className="btn-secondary mt-6">
+          <ArrowLeft size={16} />
+          Return to Events
+        </Link>
+      </div>
+    );
   }
 
   const selectedTheme = themes.find((item) => item.value === theme) || themes[0];
 
   return (
-    <div className="space-y-8">
-      <div className="grid gap-8 lg:grid-cols-[1.3fr_0.7fr]">
-        <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
-          <img src={event.imageUrl} alt={event.title} className="h-80 w-full object-cover" />
-          <div className="p-6">
-            <div className="mb-4 flex items-center justify-between gap-4">
-              <span className="rounded-full bg-orange-100 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-orange-700">
+    <div className="space-y-6 animate-fade-in-up">
+      {/* Navigation bar */}
+      <div className="flex items-center justify-between">
+        <Link
+          href="/events"
+          className="inline-flex items-center gap-2 text-sm font-semibold transition-colors text-slate-400 hover:text-white"
+        >
+          <ArrowLeft size={16} />
+          Back to all events
+        </Link>
+
+        {/* Share & Calendar Buttons */}
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={handleShare}
+            className="btn-secondary text-xs py-2 px-3.5 rounded-xl flex items-center gap-1.5"
+          >
+            {copied ? <Check size={14} className="text-emerald-400" /> : <Share2 size={14} />}
+            <span>{copied ? "Link Copied" : "Share"}</span>
+          </button>
+
+          <a
+            href={getGoogleCalendarUrl()}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="btn-secondary text-xs py-2 px-3.5 rounded-xl flex items-center gap-1.5"
+          >
+            <CalendarPlus size={14} style={{ color: "var(--accent-orange)" }} />
+            <span>Add to Google Cal</span>
+          </a>
+        </div>
+      </div>
+
+      <div className="detail-layout">
+        {/* Main Event Showcase */}
+        <div className="glass-card overflow-hidden rounded-3xl shadow-2xl">
+          {/* Banner Hero Image */}
+          <div className="relative h-96 w-full overflow-hidden bg-slate-900">
+            <img
+              src={event.imageUrl}
+              alt={event.title}
+              className="h-full w-full object-cover"
+            />
+            <div
+              className="absolute inset-0"
+              style={{
+                background:
+                  "linear-gradient(to top, rgba(10,10,15,0.95) 0%, rgba(10,10,15,0.3) 50%, transparent 100%)",
+              }}
+            />
+
+            {/* Overlays on Banner */}
+            <div className="absolute top-4 left-4 right-4 flex items-center justify-between">
+              <span className="badge badge-orange backdrop-blur-md shadow-lg text-xs py-1 px-3">
                 {event.category}
               </span>
-              <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-emerald-700">
-                {event.isActive ? "Active" : "Inactive"}
+
+              <span
+                className={`badge ${
+                  event.isActive ? "badge-emerald" : "badge-slate"
+                } backdrop-blur-md shadow-lg text-xs py-1 px-3`}
+              >
+                {event.isActive ? "● Active Event" : "○ Inactive"}
               </span>
             </div>
 
-            <h1 className="text-3xl font-bold text-slate-900">{event.title}</h1>
+            <div className="absolute bottom-5 left-6 right-6 flex items-end justify-between">
+              <div>
+                <span
+                  className="inline-flex items-center gap-1.5 rounded-xl px-3.5 py-1.5 text-base font-extrabold text-white shadow-xl"
+                  style={{
+                    background: "rgba(10,10,15,0.8)",
+                    backdropFilter: "blur(14px)",
+                    border: "1px solid rgba(255,255,255,0.15)",
+                  }}
+                >
+                  <Tag size={16} style={{ color: "var(--accent-orange)" }} />
+                  {formatPrice(event.price)}
+                </span>
+              </div>
 
-            <div className="mt-4 space-y-3 text-slate-600">
-              <div className="flex items-center gap-2">
+              {/* Remind me toggle button */}
+              <button
+                type="button"
+                onClick={toggleReminder}
+                className="flex items-center gap-2 rounded-2xl px-4 py-2.5 text-sm font-semibold text-white shadow-xl transition-all"
+                style={{
+                  background: event.isReminder
+                    ? "var(--gradient-primary)"
+                    : "rgba(255,255,255,0.1)",
+                  backdropFilter: "blur(14px)",
+                  border: "1px solid rgba(255,255,255,0.2)",
+                  boxShadow: event.isReminder ? "0 0 20px var(--accent-orange-glow)" : "none",
+                }}
+              >
+                <Bell size={16} style={{ fill: event.isReminder ? "#fff" : "none" }} />
+                <span>{event.isReminder ? "Reminder Active" : "Remind Me"}</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Details Body */}
+          <div className="p-8 sm:p-10 space-y-6">
+            <h1
+              className="text-3xl sm:text-4xl font-extrabold tracking-tight"
+              style={{ color: "var(--text-primary)" }}
+            >
+              {event.title}
+            </h1>
+
+            {/* Quick Meta Badges */}
+            <div className="flex flex-wrap gap-3">
+              <div
+                className="flex items-center gap-2 rounded-2xl px-4 py-2.5 text-sm font-semibold"
+                style={{
+                  background: "rgba(255,107,53,0.1)",
+                  border: "1px solid rgba(255,107,53,0.2)",
+                  color: "#ff8c5a",
+                }}
+              >
                 <CalendarDays size={18} />
                 <span>{formatDateTime(event.dateTime)}</span>
               </div>
-              <div className="flex items-center gap-2">
+
+              <div
+                className="flex items-center gap-2 rounded-2xl px-4 py-2.5 text-sm font-semibold"
+                style={{
+                  background: "rgba(168,85,247,0.1)",
+                  border: "1px solid rgba(168,85,247,0.2)",
+                  color: "#c084fc",
+                }}
+              >
                 <MapPin size={18} />
                 <span>{event.city}</span>
               </div>
-              <div className="flex items-center gap-2">
-                <Tag size={18} />
-                <span>{formatPrice(event.price)}</span>
-              </div>
             </div>
 
-            <p className="mt-6 text-base leading-7 text-slate-700">{event.description}</p>
+            {/* Event Description */}
+            <div className="space-y-3 pt-2">
+              <h2 className="text-xs font-bold uppercase tracking-widest text-slate-400">
+                About this Event
+              </h2>
+              <p
+                className="text-base sm:text-lg leading-relaxed text-slate-300"
+                style={{ whiteSpace: "pre-line" }}
+              >
+                {event.description}
+              </p>
+            </div>
           </div>
         </div>
 
-        <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
-          <div className="mb-4 flex items-center gap-2 text-orange-600">
-            <Sparkles size={18} />
-            <h2 className="text-xl font-bold text-slate-900">Design your card</h2>
+        {/* Interactive Event Pass Designer */}
+        <div className="glass-card rounded-3xl p-6 sm:p-7 space-y-6">
+          <div className="flex items-center gap-2">
+            <span
+              className="flex h-8 w-8 items-center justify-center rounded-xl"
+              style={{ background: "rgba(255,107,53,0.15)" }}
+            >
+              <Sparkles size={16} style={{ color: "var(--accent-orange)" }} />
+            </span>
+            <div>
+              <h2 className="text-lg font-bold" style={{ color: "var(--text-primary)" }}>
+                Personalize Card Pass
+              </h2>
+              <p className="text-xs text-slate-400">Style your collectible event pass</p>
+            </div>
           </div>
 
-          <div className="mb-5">
-            <p className="mb-3 text-sm font-medium text-slate-700">Background theme</p>
-            <div className="flex flex-wrap gap-2">
+          {/* Theme Palette */}
+          <div>
+            <p className="mb-2 text-xs font-bold uppercase tracking-wider text-slate-400">
+              Color Theme
+            </p>
+            <div className="flex flex-wrap gap-2.5">
               {themes.map((item) => (
                 <button
                   key={item.value}
                   type="button"
                   onClick={() => handleThemeChange(item.value)}
-                  className={`h-10 w-10 rounded-full border-2 ${
-                    theme === item.value ? "border-slate-900" : "border-white"
-                  } bg-gradient-to-br ${item.className}`}
+                  className={`h-10 w-10 rounded-xl bg-gradient-to-br ${item.className} transition-all duration-200`}
+                  style={{
+                    border: theme === item.value ? "3px solid #ffffff" : "2px solid transparent",
+                    transform: theme === item.value ? "scale(1.12)" : "scale(1)",
+                    boxShadow: theme === item.value ? "0 0 16px rgba(255,255,255,0.25)" : "none",
+                  }}
+                  title={item.label}
                   aria-label={item.label}
                 />
               ))}
             </div>
           </div>
 
+          {/* Stickers Tray */}
           <div>
-            <p className="mb-3 text-sm font-medium text-slate-700">Add stickers</p>
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+                <Smile size={13} />
+                Add Stickers ({selectedStickers.length}/4)
+              </p>
+            </div>
             <div className="flex flex-wrap gap-2">
-              {stickers.map((emoji) => (
+              {availableStickers.map((emoji) => (
                 <button
                   key={emoji}
                   type="button"
                   onClick={() => handleAddSticker(emoji)}
-                  className="flex h-11 w-11 items-center justify-center rounded-xl border border-slate-200 bg-slate-50 text-xl transition hover:border-slate-300"
+                  className="flex h-10 w-10 items-center justify-center rounded-xl text-lg transition-transform hover:scale-115"
+                  style={{
+                    background: "rgba(255,255,255,0.05)",
+                    border: "1px solid var(--glass-border)",
+                  }}
+                  title={`Add ${emoji}`}
                 >
                   {emoji}
                 </button>
@@ -192,49 +435,109 @@ export default function EventDetailPage() {
             </div>
           </div>
 
-          <div className="mt-6">
-            <p className="mb-3 text-sm font-medium text-slate-700">Your live card</p>
-            <div className={`relative overflow-hidden rounded-2xl border border-slate-200 bg-gradient-to-br ${selectedTheme.className} p-5 transition-all duration-300`}>
-              <div className="absolute inset-0 bg-white/10" />
-              <div className="relative z-10 flex min-h-[180px] flex-col justify-between">
-                <div className="flex items-center justify-between text-sm font-semibold text-slate-800">
-                  <span>{event.city}</span>
-                  <span>{event.category}</span>
+          {/* Custom Greeting Input */}
+          <div>
+            <p className="mb-2 text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+              <Type size={13} />
+              Custom Note
+            </p>
+            <input
+              value={customNote}
+              onChange={(e) => setCustomNote(e.target.value)}
+              placeholder="e.g. See you there! or Going with team!"
+              maxLength={35}
+              className="form-input text-xs"
+            />
+          </div>
+
+          {/* Live Card Pass Preview */}
+          <div>
+            <p className="mb-2 text-xs font-bold uppercase tracking-wider text-slate-400">
+              Your Pass Preview
+            </p>
+            <div
+              className={`relative overflow-hidden rounded-2xl bg-gradient-to-br ${selectedTheme.className} p-6 shadow-2xl transition-all duration-500`}
+              style={{ border: "1px solid rgba(255,255,255,0.3)" }}
+            >
+              <div className="relative z-10 flex min-h-[200px] flex-col justify-between">
+                <div className="flex items-center justify-between text-xs font-extrabold uppercase tracking-wider opacity-85">
+                  <span className={selectedTheme.textColor}>{event.city}</span>
+                  <span
+                    className="rounded-full px-2.5 py-0.5 text-[11px] font-bold"
+                    style={{ background: "rgba(0,0,0,0.15)", color: "inherit" }}
+                  >
+                    {event.category}
+                  </span>
                 </div>
 
-                <div>
-                  <h3 className="text-2xl font-bold text-slate-900">{event.title}</h3>
-                  <p className="mt-2 text-sm text-slate-700">{formatDateTime(event.dateTime)}</p>
+                <div className="my-3">
+                  <h3
+                    className={`text-xl font-extrabold tracking-tight ${selectedTheme.textColor}`}
+                  >
+                    {event.title}
+                  </h3>
+                  <p className={`mt-1 text-xs font-medium opacity-80 ${selectedTheme.textColor}`}>
+                    {formatDateTime(event.dateTime)}
+                  </p>
+                  {customNote && (
+                    <p
+                      className={`mt-2 text-xs italic font-semibold ${selectedTheme.textColor} opacity-90`}
+                    >
+                      &quot;{customNote}&quot;
+                    </p>
+                  )}
                 </div>
 
-                <div className="flex min-h-[48px] items-end gap-2 text-2xl">
-                  {selectedStickers.map((emoji, index) => (
-                    <span key={`${emoji}-${index}`} className="animate-bounce">{emoji}</span>
-                  ))}
+                {/* Stickers row */}
+                <div className="flex min-h-[40px] items-center gap-2 text-2xl pt-2">
+                  {selectedStickers.length === 0 ? (
+                    <span className="text-xs opacity-60">Tap stickers above to decorate</span>
+                  ) : (
+                    selectedStickers.map((emoji, index) => (
+                      <span
+                        key={`${emoji}-${index}`}
+                        className="animate-bounce"
+                        style={{ animationDuration: `${1 + index * 0.2}s` }}
+                      >
+                        {emoji}
+                      </span>
+                    ))
+                  )}
                 </div>
               </div>
             </div>
           </div>
 
-          {selectedStickers.length > 0 ? (
-            <div className="mt-5 flex flex-wrap gap-2">
-              {selectedStickers.map((emoji, index) => (
+          {/* Remove Stickers List */}
+          {selectedStickers.length > 0 && (
+            <div className="flex flex-wrap gap-1.5">
+              {selectedStickers.map((emoji, idx) => (
                 <button
-                  key={`${emoji}-${index}`}
+                  key={`${emoji}-${idx}`}
                   type="button"
-                  onClick={() => handleRemoveSticker(emoji)}
-                  className="rounded-full border border-slate-200 bg-white px-3 py-1 text-sm"
+                  onClick={() => handleRemoveSticker(idx)}
+                  className="rounded-lg px-2.5 py-1 text-xs bg-rose-500/10 text-rose-300 border border-rose-500/20 hover:bg-rose-500/20 transition-colors flex items-center gap-1"
                 >
-                  {emoji} Remove
+                  <span>{emoji}</span>
+                  <span>✕</span>
                 </button>
               ))}
             </div>
-          ) : null}
+          )}
 
-          {saving ? <p className="mt-4 text-sm text-slate-500">Saving design...</p> : null}
-          {error ? <p className="mt-4 text-sm text-red-600">{error}</p> : null}
+          {saving && <p className="text-xs text-slate-400">Saving customized pass...</p>}
         </div>
       </div>
+
+      {/* Toast Notification */}
+      {toastMessage && (
+        <div className="toast-container">
+          <div className="toast">
+            <CheckCircle2 size={18} className="text-emerald-400 shrink-0" />
+            <span>{toastMessage}</span>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
