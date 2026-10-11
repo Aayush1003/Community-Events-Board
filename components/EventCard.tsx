@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { Bell, CalendarDays, MapPin, Tag, ArrowUpRight } from "lucide-react";
 import { formatDateTime, formatPrice } from "@/lib/format";
@@ -33,10 +34,13 @@ export function EventCard({ event, userLoggedIn, onToggleReminder, index = 0 }: 
       <div>
         {/* Image with overlay and badges */}
         <div className="relative h-52 w-full overflow-hidden bg-slate-900">
-          <img
+          <Image
             src={event.imageUrl}
             alt={event.title}
-            className="h-full w-full object-cover transition-transform duration-700 ease-out group-hover:scale-105"
+            fill
+            sizes="(max-width: 768px) 100vw, (max-width: 1280px) 50vw, 33vw"
+            unoptimized
+            className="object-cover transition-transform duration-700 ease-out group-hover:scale-105"
             loading="lazy"
           />
           <div

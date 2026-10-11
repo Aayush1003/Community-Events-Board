@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import {
@@ -187,8 +188,8 @@ export default function EventDetailPage() {
   if (loading) {
     return (
       <div className="detail-layout">
-        <div className="shimmer h-[620px] rounded-3xl" />
-        <div className="shimmer h-[520px] rounded-3xl" />
+        <div className="shimmer h-155 rounded-3xl" />
+        <div className="shimmer h-130 rounded-3xl" />
       </div>
     );
   }
@@ -225,10 +226,13 @@ export default function EventDetailPage() {
         <div className="glass-card overflow-hidden rounded-3xl shadow-2xl">
           {/* Banner Hero Image */}
           <div className="relative h-96 w-full overflow-hidden bg-slate-900">
-            <img
+            <Image
               src={event.imageUrl}
               alt={event.title}
-              className="h-full w-full object-cover"
+              fill
+              sizes="(max-width: 1024px) 100vw, 60vw"
+              unoptimized
+              className="object-cover"
             />
             <div
               className="absolute inset-0"
@@ -367,7 +371,7 @@ export default function EventDetailPage() {
                   key={item.value}
                   type="button"
                   onClick={() => handleThemeChange(item.value)}
-                  className={`h-10 w-10 rounded-xl bg-gradient-to-br ${item.className} transition-all duration-200`}
+                  className={`h-10 w-10 rounded-xl bg-linear-to-br ${item.className} transition-all duration-200`}
                   style={{
                     border: theme === item.value ? "3px solid #ffffff" : "2px solid transparent",
                     transform: theme === item.value ? "scale(1.12)" : "scale(1)",
@@ -413,10 +417,10 @@ export default function EventDetailPage() {
               Your Pass Preview
             </p>
             <div
-              className={`relative overflow-hidden rounded-2xl bg-gradient-to-br ${selectedTheme.className} p-6 shadow-2xl transition-all duration-500`}
+              className={`relative overflow-hidden rounded-2xl bg-linear-to-br ${selectedTheme.className} p-6 shadow-2xl transition-all duration-500`}
               style={{ border: "1px solid rgba(255,255,255,0.3)" }}
             >
-              <div className="relative z-10 flex min-h-[200px] flex-col justify-between">
+              <div className="relative z-10 flex min-h-50 flex-col justify-between">
                 <div className="flex items-center justify-between text-xs font-extrabold uppercase tracking-wider opacity-85">
                   <span className={selectedTheme.textColor}>{event.city}</span>
                   <span
@@ -439,7 +443,7 @@ export default function EventDetailPage() {
                 </div>
 
                 {/* Stickers row */}
-                <div className="flex min-h-[40px] items-center gap-2 text-2xl pt-2">
+                <div className="flex min-h-10 items-center gap-2 text-2xl pt-2">
                   {selectedStickers.length === 0 ? (
                     <span className="text-xs opacity-60">Tap stickers above to decorate</span>
                   ) : (

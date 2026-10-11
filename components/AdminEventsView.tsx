@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { type FormEvent, useEffect, useState, useMemo } from "react";
 import {
   PlusCircle,
@@ -386,12 +387,15 @@ export default function AdminEventsView() {
               {/* Live Image Preview */}
               {form.imageUrl && (
                 <div className="mt-2 relative h-28 w-full overflow-hidden rounded-xl border border-white/10">
-                  <img
+                  <Image
                     src={form.imageUrl}
                     alt="Preview"
-                    className="h-full w-full object-cover"
-                    onError={(e) => {
-                      (e.target as HTMLElement).style.display = "none";
+                    fill
+                    sizes="(max-width: 640px) 100vw, 400px"
+                    unoptimized
+                    className="object-cover"
+                    onError={(event) => {
+                      event.currentTarget.style.display = "none";
                     }}
                   />
                   <span className="absolute bottom-1 right-2 text-[10px] bg-black/70 px-1.5 py-0.5 rounded text-white font-mono">
@@ -507,9 +511,12 @@ export default function AdminEventsView() {
                 >
                   {/* Left: Thumbnail & Details */}
                   <div className="flex items-center gap-4">
-                    <img
+                    <Image
                       src={item.imageUrl}
                       alt={item.title}
+                      width={64}
+                      height={64}
+                      unoptimized
                       className="h-16 w-16 rounded-xl object-cover shrink-0"
                     />
 

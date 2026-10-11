@@ -355,7 +355,7 @@ export default function EventsPage() {
       {loading ? (
         <div className="events-grid">
           {[1, 2, 3, 4, 5, 6].map((i) => (
-            <div key={i} className="shimmer h-[450px] rounded-2xl" />
+            <div key={i} className="shimmer h-112.5 rounded-2xl" />
           ))}
         </div>
       ) : filteredEvents.length === 0 ? (

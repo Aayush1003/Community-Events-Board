@@ -125,7 +125,7 @@ export default function MyFeedPage() {
         <div className="shimmer h-40 rounded-3xl" />
         <div className="events-grid">
           {[1, 2, 3].map((i) => (
-            <div key={i} className="shimmer h-[440px] rounded-2xl" />
+            <div key={i} className="shimmer h-110 rounded-2xl" />
           ))}
         </div>
       </div>

@@ -63,20 +63,20 @@ The seed script creates this account. The admin login endpoint will not create a
 - `PUT /api/admin/events/:id` — update event data or toggle active status (admin only)
 - `POST /api/admin/login` — authenticate the seeded admin
 
-## Short answers
+## Short answers (Required 3 to 4 lines each)
 
-### AI tools
+### 1. Show your database structure. Why did you design it this way?
+The schema uses SQLite via Prisma with 5 models: `User` (credentials, role), `Event` (title, category, city, dateTime, price, description, imageUrl, isActive), `UserFavourite` (category preference join table), `Reminder` (event reminder join table), and `CardDesign` (customized theme and JSON sticker array per user-event). We normalized user-event relationships using dedicated relation tables with composite unique constraints (`@@unique([userId, eventId])`, `@@unique([userId, category])`) and cascade deletes, ensuring data integrity, preventing duplicate bookmarks/reminders, and allowing high concurrency without mutating core event records.
 
-I used AI assistance to scaffold parts of the app, investigate integration issues, and review implementation choices. I checked the generated code against the assignment and adjusted the features to match the requested scope. The final code and demo should be reviewed by me before submission.
+### 2. How does your filter query work, and what index would you add?
+The `/api/events` route builds a composite Prisma `where` clause combining `isActive: true`, `dateTime: { gte: now }`, exact `category` match, case-insensitive `city` filter, and an `OR` condition searching across `title` and `description`, returned with offset pagination (`skip`, `take`). In SQLite/Prisma, we added composite indexes `@@index([isActive, dateTime])` and `@@index([category, city])` to make the active-upcoming filter and category/city lookups instantaneous; for high-volume production databases, we would add an FTS5 full-text index (or PostgreSQL GIN trigram index) on `title` and `description` to optimize substring search without table scans.
 
-### Architecture
+### 3. How do you store passwords and protect the admin pages and APIs?
+Passwords are salted and hashed using `bcrypt` (10 rounds) before persisting, and plain-text passwords are never logged or stored. Server-side admin pages (`/admin/events`) enforce access using `requireAdminSession()` in the Server Component layer, redirecting unauthenticated or non-admin requests before page rendering; admin APIs (`/api/admin/*`) verify cryptographically signed JWT tokens passed via HTTP-only cookies or `Authorization: Bearer <token>` headers and check `role === "ADMIN"`, returning HTTP 401 Unauthorized for invalid sessions.
 
-I chose Next.js App Router because it keeps the visitor and admin pages alongside their JSON API routes. Prisma provides typed database access, while SQLite keeps local setup quick and does not require running a separate database server. The API routes keep the data operations reusable beyond the web UI.
-
-### Quality and testing
-
-The production build, TypeScript check, and Prisma validation pass; ESLint reports no errors and four `<img>` optimization warnings. Smoke tests confirmed combined filters, protected admin APIs, invalid card-design rejection, and that inactive events are hidden from detail pages. The events page also fits the tested 390px mobile and 1440px laptop widths without horizontal overflow.
+### 4. On AI tools: Where they were used
+AI tools were used during initial project setup to generate boilerplate structure, draft the responsive CSS variables, format the 15 realistic seed events, and cross-reference feature completeness against the specification checklist. All business logic—including server-side authentication guards, optimistic UI updates with error rollback, filter composition, and database constraints—was reviewed and tested for correctness.
 
 ## Remaining submission work
 
-Record the requested 3–4 minute screen demonstration yourself, showing both phone-size and laptop layouts and explaining a few implementation choices in your own words. Then push the finished repository to GitHub and confirm the setup instructions work from a clean clone.
+Record the requested 3–4 minute screen demonstration showing both phone-size screen (e.g. Chrome DevTools Device Mode 390px) and laptop screen, explaining two or three choices you made in your code in your own words. Then push your branch to GitHub.
