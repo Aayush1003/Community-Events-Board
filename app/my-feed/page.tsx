@@ -70,6 +70,15 @@ export default function MyFeedPage() {
   }, [router]);
 
   async function toggleReminder(eventId: string) {
+    const targetEvent = events.find((event) => event.id === eventId);
+    const previousReminder = Boolean(targetEvent?.isReminder);
+    const optimisticReminder = !previousReminder;
+    setEvents((current) =>
+      current.map((event) =>
+        event.id === eventId ? { ...event, isReminder: optimisticReminder } : event
+      )
+    );
+
     try {
       const response = await fetch("/api/reminders", {
         method: "POST",
@@ -81,23 +90,31 @@ export default function MyFeedPage() {
       const data = await response.json();
 
       if (!response.ok) {
+        setEvents((current) =>
+          current.map((event) =>
+            event.id === eventId ? { ...event, isReminder: previousReminder } : event
+          )
+        );
         showToast(data.error || "Unable to update reminder.");
         return;
       }
-
-      const target = events.find((e) => e.id === eventId);
-      showToast(
-        data.isReminder
-          ? `Reminder saved for "${target?.title || "event"}"!`
-          : "Reminder removed."
-      );
 
       setEvents((current) =>
         current.map((event) =>
           event.id === eventId ? { ...event, isReminder: data.isReminder } : event
         )
       );
+      showToast(
+        data.isReminder
+          ? `Reminder saved for "${targetEvent?.title || "event"}"!`
+          : "Reminder removed."
+      );
     } catch {
+      setEvents((current) =>
+        current.map((event) =>
+          event.id === eventId ? { ...event, isReminder: previousReminder } : event
+        )
+      );
       showToast("Error updating reminder.");
     }
   }

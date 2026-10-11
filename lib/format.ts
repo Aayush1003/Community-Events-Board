@@ -11,9 +11,12 @@ export function formatDateTime(value: string | Date) {
     weekday: "short",
     day: "2-digit",
     month: "short",
-    hour: "2-digit",
+    hour: "numeric",
     minute: "2-digit",
-  }).format(new Date(value));
+    hour12: true,
+  })
+    .format(new Date(value))
+    .replace(/\b(am|pm)\b/i, (period) => period.toUpperCase());
 }
 
 export function formatEventDate(date: string | Date) {

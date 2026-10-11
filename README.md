@@ -1,68 +1,82 @@
 # Community Events Board
 
-A polished Next.js App Router app for managing local events, browsing them as a visitor, saving favourites, and customizing event cards.
+A responsive local-events app built with the Next.js App Router, Prisma, and SQLite. Visitors can browse upcoming community events, save category preferences and reminders, and personalize an event card. Admins can create events and switch them between active and inactive.
 
-## Setup in under 5 minutes
+## Run locally
 
-1. Install dependencies
+You need Node.js and npm. No separate database server or SQLite installation is required.
 
-```bash
-npm install
-```
+1. Install dependencies:
 
-2. Generate Prisma client and initialize SQLite
+   ```bash
+   npm install
+   ```
 
-```bash
-npx prisma generate
-npx prisma db push
-npx tsx prisma/seed.ts
-```
+2. Create your local environment file:
 
-3. Start the app
+   ```powershell
+   Copy-Item .env.example .env
+   ```
 
-```bash
-npm run dev
-```
+   On macOS/Linux, use `cp .env.example .env`. For deployment, replace the example `JWT_SECRET` with a long, random value.
 
-Open http://localhost:3000
+3. Create the local SQLite database, generate the Prisma client, and add the demo data:
+
+   ```bash
+   npx prisma generate
+   npx prisma db push
+   npx tsx prisma/seed.ts
+   ```
+
+   The seed script resets the local app data before inserting 15 sample events and the demo admin, so only run it on a fresh development database or when you intend to reset that data.
+
+4. Start the development server:
+
+   ```bash
+   npm run dev
+   ```
+
+   Open [http://localhost:3000](http://localhost:3000).
+
+The SQLite file is stored at `prisma/dev.db`.
 
 ## Admin login
 
 - Email: `admin@community.com`
 - Password: `admin123`
 
-This admin is created automatically by the seed script.
+The seed script creates this account. The admin login endpoint will not create an admin account from arbitrary submitted credentials.
 
 ## API overview
 
-- `POST /api/auth/signup` — create a visitor account and set the JWT cookie
-- `POST /api/auth/login` — login and return the user session
-- `GET /api/auth/me` — fetch the current logged-in user
-- `GET /api/events` — filter active upcoming events by category, city, and text search
-- `GET /api/events/:id` — fetch one event plus reminder/card-design state for the session user
-- `GET /api/feed` — return events matching the user’s favourite categories
-- `POST /api/favourites` — save or remove favourite categories
-- `POST /api/reminders` — save or remove a reminder for a given event
-- `POST /api/card-design` — save theme and sticker selection for a user/event pair
-- `GET /api/admin/events` — admin list of all events
-- `POST /api/admin/events` — create a new event
-- `PUT /api/admin/events/:id` — toggle active/inactive status or update event data
-- `POST /api/admin/login` — admin login
-
-## Notes on what is left
-
-This implementation covers the requested app flow end-to-end and is ready for a local run and reviewer demo. No major gaps remain in the core assignment requirements.
+- `POST /api/auth/signup` — create a visitor account and set a JWT session cookie
+- `POST /api/auth/login` — authenticate and return a JWT plus user session
+- `POST /api/auth/logout` — clear the session cookie
+- `GET /api/auth/me` — return the current session user
+- `GET /api/events` — list upcoming active events; supports category, city, text search, and pagination together
+- `GET /api/events/:id` — return an event and the signed-in user's reminder/card design
+- `GET /api/feed` — list upcoming active events in the user's favourite categories
+- `GET/POST /api/favourites` — read or save favourite categories
+- `GET/POST /api/reminders` — list or toggle a reminder
+- `POST /api/card-design` — save an event-card theme and up to three stickers
+- `GET/POST /api/admin/events` — list or create events (admin only)
+- `PUT /api/admin/events/:id` — update event data or toggle active status (admin only)
+- `POST /api/admin/login` — authenticate the seeded admin
 
 ## Short answers
 
-### On AI tools
+### AI tools
 
-I used AI assistance for scaffolding, debugging Prisma/Next integration issues, and improving the code structure. I reviewed every generated line and adjusted the implementation to match the assignment requirements and the project’s exact runtime needs.
+I used AI assistance to scaffold parts of the app, investigate integration issues, and review implementation choices. I checked the generated code against the assignment and adjusted the features to match the requested scope. The final code and demo should be reviewed by me before submission.
 
-### On architecture choice
+### Architecture
 
-I used Next.js App Router with Prisma + SQLite because it keeps the app lightweight, fast to set up, and easy to extend. The API layer is clear and reusable for a future mobile client while the UI remains polished and responsive for both desktop and mobile screens.
+I chose Next.js App Router because it keeps the visitor and admin pages alongside their JSON API routes. Prisma provides typed database access, while SQLite keeps local setup quick and does not require running a separate database server. The API routes keep the data operations reusable beyond the web UI.
 
-### On quality and testing
+### Quality and testing
 
-I focused on responsive UI states, consistent styling, and realistic sample data so the app feels complete during review. I also validated the production build and local server flow to make sure the required pages and APIs run correctly.
+The production build, TypeScript check, and Prisma validation pass; ESLint reports no errors and four `<img>` optimization warnings. Smoke tests confirmed combined filters, protected admin APIs, invalid card-design rejection, and that inactive events are hidden from detail pages. The events page also fits the tested 390px mobile and 1440px laptop widths without horizontal overflow.
+
+## Remaining submission work
+
+Record the requested 3–4 minute screen demonstration yourself, showing both phone-size and laptop layouts and explaining a few implementation choices in your own words. Then push the finished repository to GitHub and confirm the setup instructions work from a clean clone.

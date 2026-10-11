@@ -21,23 +21,15 @@ export async function POST(request: Request) {
     const email = result.data.email.toLowerCase();
     const password = result.data.password;
 
-    let adminUser = await prisma.user.findUnique({ where: { email } });
+    const adminUser = await prisma.user.findUnique({ where: { email } });
 
-    if (!adminUser) {
-      const passwordHash = await bcrypt.hash(password, 10);
-      adminUser = await prisma.user.create({
-        data: {
-          name: "Admin User",
-          email,
-          passwordHash,
-          role: "ADMIN",
-        },
-      });
+    if (!adminUser || adminUser.role !== "ADMIN") {
+      return NextResponse.json({ error: "Invalid admin credentials." }, { status: 401 });
     }
 
     const passwordMatches = await bcrypt.compare(password, adminUser.passwordHash);
 
-    if (!passwordMatches || adminUser.role !== "ADMIN") {
+    if (!passwordMatches) {
       return NextResponse.json({ error: "Invalid admin credentials." }, { status: 401 });
     }
 

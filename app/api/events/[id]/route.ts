@@ -5,7 +5,11 @@ import { prisma } from "@/lib/prisma";
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const event = await prisma.event.findUnique({
-    where: { id },
+    where: {
+      id,
+      isActive: true,
+      dateTime: { gte: new Date() },
+    },
   });
 
   if (!event) {

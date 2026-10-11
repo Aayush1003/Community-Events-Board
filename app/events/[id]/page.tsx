@@ -9,12 +9,8 @@ import {
   Sparkles,
   ArrowLeft,
   Bell,
-  Share2,
-  CalendarPlus,
-  Check,
   CheckCircle2,
   Smile,
-  Type,
 } from "lucide-react";
 import Link from "next/link";
 import { formatDateTime, formatPrice } from "@/lib/format";
@@ -40,22 +36,18 @@ const themes = [
   { label: "Sunset Glow", value: "sunset", className: "from-orange-400 via-pink-400 to-rose-300", textColor: "text-slate-900" },
   { label: "Ocean Breeze", value: "ocean", className: "from-cyan-300 via-sky-300 to-indigo-300", textColor: "text-slate-900" },
   { label: "Neon Cyber", value: "cyber", className: "from-purple-900 via-indigo-900 to-slate-950", textColor: "text-purple-100" },
-  { label: "Emerald Meadow", value: "forest", className: "from-emerald-400 via-teal-300 to-lime-200", textColor: "text-slate-900" },
-  { label: "Golden Hour", value: "gold", className: "from-amber-400 via-orange-300 to-yellow-200", textColor: "text-slate-900" },
 ];
 
-const availableStickers = ["🎉", "🎵", "🌟", "✨", "🍕", "🎸", "☕", "🎨", "🎟️", "🔥", "🚀", "🎈"];
+const availableStickers = ["🎉", "🎵", "🌟", "🍕", "🎨"];
 
 export default function EventDetailPage() {
   const params = useParams();
   const [event, setEvent] = useState<EventDetail | null>(null);
   const [theme, setTheme] = useState("sunset");
   const [selectedStickers, setSelectedStickers] = useState<string[]>([]);
-  const [customNote, setCustomNote] = useState("Can't wait for this!");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
-  const [copied, setCopied] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   function showToast(msg: string) {
@@ -80,8 +72,18 @@ export default function EventDetailPage() {
         }
 
         setEvent(data);
-        setTheme(data.cardDesign?.theme || "sunset");
-        setSelectedStickers(data.cardDesign?.stickers || []);
+        setTheme(
+          themes.some((item) => item.value === data.cardDesign?.theme)
+            ? data.cardDesign.theme
+            : "sunset"
+        );
+        setSelectedStickers(
+          Array.isArray(data.cardDesign?.stickers)
+            ? data.cardDesign.stickers
+                .filter((sticker: string) => availableStickers.includes(sticker))
+                .slice(0, 3)
+            : []
+        );
         setLoading(false);
       } catch {
         setError("Unable to load event details.");
@@ -111,17 +113,28 @@ export default function EventDetailPage() {
       setSaving(false);
 
       if (!response.ok) {
-        showToast("Log in to save your customized card design to your profile.");
+        showToast(
+          response.status === 401
+            ? "Log in to save your customized card design."
+            : "Unable to save your card design. Please try again."
+        );
       } else {
         showToast("Custom card design saved!");
       }
     } catch {
       setSaving(false);
+      showToast("Unable to save your card design. Please try again.");
     }
   }
 
   async function toggleReminder() {
     if (!event) return;
+
+    const previousReminder = Boolean(event.isReminder);
+    const optimisticReminder = !previousReminder;
+    setEvent((current) =>
+      current ? { ...current, isReminder: optimisticReminder } : null
+    );
 
     try {
       const response = await fetch("/api/reminders", {
@@ -133,6 +146,9 @@ export default function EventDetailPage() {
 
       const data = await response.json();
       if (!response.ok) {
+        setEvent((current) =>
+          current ? { ...current, isReminder: previousReminder } : null
+        );
         showToast(data.error || "Please log in to set event reminders.");
         return;
       }
@@ -140,16 +156,10 @@ export default function EventDetailPage() {
       setEvent((current) => (current ? { ...current, isReminder: data.isReminder } : null));
       showToast(data.isReminder ? "Added to your reminders!" : "Removed from reminders.");
     } catch {
+      setEvent((current) =>
+        current ? { ...current, isReminder: previousReminder } : null
+      );
       showToast("Unable to update reminder.");
-    }
-  }
-
-  async function handleShare() {
-    if (navigator.clipboard) {
-      await navigator.clipboard.writeText(window.location.href);
-      setCopied(true);
-      showToast("Event link copied to clipboard!");
-      setTimeout(() => setCopied(false), 2500);
     }
   }
 
@@ -159,8 +169,8 @@ export default function EventDetailPage() {
   }
 
   function handleAddSticker(emoji: string) {
-    if (selectedStickers.length >= 4) {
-      showToast("Max 4 stickers on card.");
+    if (selectedStickers.length >= 3) {
+      showToast("You can add up to 3 stickers.");
       return;
     }
     const next = [...selectedStickers, emoji];
@@ -172,22 +182,6 @@ export default function EventDetailPage() {
     const next = selectedStickers.filter((_, i) => i !== index);
     setSelectedStickers(next);
     void saveDesign(theme, next);
-  }
-
-  // Google Calendar URL generator
-  function getGoogleCalendarUrl() {
-    if (!event) return "#";
-    const startDate = new Date(event.dateTime);
-    const endDate = new Date(startDate.getTime() + 2 * 60 * 60 * 1000); // 2 hours
-    const formatGDate = (d: Date) => d.toISOString().replace(/-|:|\.\d\d\d/g, "");
-    const title = encodeURIComponent(event.title);
-    const details = encodeURIComponent(
-      `${event.description}\n\nCity: ${event.city}\nPrice: ${formatPrice(event.price)}`
-    );
-    const location = encodeURIComponent(event.city);
-    return `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${title}&details=${details}&location=${location}&dates=${formatGDate(
-      startDate
-    )}/${formatGDate(endDate)}`;
   }
 
   if (loading) {
@@ -216,7 +210,7 @@ export default function EventDetailPage() {
   return (
     <div className="space-y-6 animate-fade-in-up">
       {/* Navigation bar */}
-      <div className="flex items-center justify-between">
+      <div>
         <Link
           href="/events"
           className="inline-flex items-center gap-2 text-sm font-semibold transition-colors text-slate-400 hover:text-white"
@@ -224,28 +218,6 @@ export default function EventDetailPage() {
           <ArrowLeft size={16} />
           Back to all events
         </Link>
-
-        {/* Share & Calendar Buttons */}
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={handleShare}
-            className="btn-secondary text-xs py-2 px-3.5 rounded-xl flex items-center gap-1.5"
-          >
-            {copied ? <Check size={14} className="text-emerald-400" /> : <Share2 size={14} />}
-            <span>{copied ? "Link Copied" : "Share"}</span>
-          </button>
-
-          <a
-            href={getGoogleCalendarUrl()}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="btn-secondary text-xs py-2 px-3.5 rounded-xl flex items-center gap-1.5"
-          >
-            <CalendarPlus size={14} style={{ color: "var(--accent-orange)" }} />
-            <span>Add to Google Cal</span>
-          </a>
-        </div>
       </div>
 
       <div className="detail-layout">
@@ -413,7 +385,7 @@ export default function EventDetailPage() {
             <div className="flex items-center justify-between mb-2">
               <p className="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
                 <Smile size={13} />
-                Add Stickers ({selectedStickers.length}/4)
+                Add Stickers ({selectedStickers.length}/3)
               </p>
             </div>
             <div className="flex flex-wrap gap-2">
@@ -433,21 +405,6 @@ export default function EventDetailPage() {
                 </button>
               ))}
             </div>
-          </div>
-
-          {/* Custom Greeting Input */}
-          <div>
-            <p className="mb-2 text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
-              <Type size={13} />
-              Custom Note
-            </p>
-            <input
-              value={customNote}
-              onChange={(e) => setCustomNote(e.target.value)}
-              placeholder="e.g. See you there! or Going with team!"
-              maxLength={35}
-              className="form-input text-xs"
-            />
           </div>
 
           {/* Live Card Pass Preview */}
@@ -479,13 +436,6 @@ export default function EventDetailPage() {
                   <p className={`mt-1 text-xs font-medium opacity-80 ${selectedTheme.textColor}`}>
                     {formatDateTime(event.dateTime)}
                   </p>
-                  {customNote && (
-                    <p
-                      className={`mt-2 text-xs italic font-semibold ${selectedTheme.textColor} opacity-90`}
-                    >
-                      &quot;{customNote}&quot;
-                    </p>
-                  )}
                 </div>
 
                 {/* Stickers row */}
