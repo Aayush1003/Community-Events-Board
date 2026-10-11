@@ -1,8 +1,8 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
-import { useState } from "react";
-import { Bell, CalendarDays, MapPin, Tag, ArrowUpRight, Share2, Check } from "lucide-react";
+import { Bell, CalendarDays, MapPin, Tag, ArrowUpRight } from "lucide-react";
 import { formatDateTime, formatPrice } from "@/lib/format";
 
 type EventCardProps = {
@@ -24,19 +24,6 @@ type EventCardProps = {
 };
 
 export function EventCard({ event, userLoggedIn, onToggleReminder, index = 0 }: EventCardProps) {
-  const [copied, setCopied] = useState(false);
-
-  async function handleShare(e: React.MouseEvent) {
-    e.preventDefault();
-    e.stopPropagation();
-    const url = `${window.location.origin}/events/${event.id}`;
-    if (navigator.clipboard) {
-      await navigator.clipboard.writeText(url);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    }
-  }
-
   return (
     <article
       className={`glass-card group flex flex-col justify-between overflow-hidden rounded-2xl animate-fade-in-up stagger-${Math.min(index + 1, 9)}`}
@@ -47,10 +34,13 @@ export function EventCard({ event, userLoggedIn, onToggleReminder, index = 0 }: 
       <div>
         {/* Image with overlay and badges */}
         <div className="relative h-52 w-full overflow-hidden bg-slate-900">
-          <img
+          <Image
             src={event.imageUrl}
             alt={event.title}
-            className="h-full w-full object-cover transition-transform duration-700 ease-out group-hover:scale-105"
+            fill
+            sizes="(max-width: 768px) 100vw, (max-width: 1280px) 50vw, 33vw"
+            unoptimized
+            className="object-cover transition-transform duration-700 ease-out group-hover:scale-105"
             loading="lazy"
           />
           <div
@@ -66,23 +56,6 @@ export function EventCard({ event, userLoggedIn, onToggleReminder, index = 0 }: 
             <span className="badge badge-orange backdrop-blur-md shadow-lg">
               {event.category}
             </span>
-          </div>
-
-          {/* Floating Share button */}
-          <div className="absolute right-3 top-3">
-            <button
-              type="button"
-              onClick={handleShare}
-              className="flex h-8 w-8 items-center justify-center rounded-full text-white backdrop-blur-md transition-all"
-              style={{
-                background: copied ? "rgba(16, 185, 129, 0.85)" : "rgba(0, 0, 0, 0.55)",
-                border: "1px solid rgba(255, 255, 255, 0.15)",
-              }}
-              title={copied ? "Copied link!" : "Share event"}
-              aria-label="Share event"
-            >
-              {copied ? <Check size={14} /> : <Share2 size={13} />}
-            </button>
           </div>
 
           {/* Price Tag Overlay */}

@@ -5,8 +5,8 @@ import { prisma } from "@/lib/prisma";
 
 const schema = z.object({
   eventId: z.string().min(1),
-  theme: z.string().min(1),
-  stickers: z.array(z.string()).max(3),
+  theme: z.enum(["sunset", "ocean", "cyber"]),
+  stickers: z.array(z.enum(["🎉", "🎵", "🌟", "🍕", "🎨"])).max(3),
 });
 
 export async function POST(request: Request) {

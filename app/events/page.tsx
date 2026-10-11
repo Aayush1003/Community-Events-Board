@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState } from "react";
+import Link from "next/link";
 import {
   Search,
   SlidersHorizontal,
@@ -9,7 +10,6 @@ import {
   Sparkles,
   CalendarDays,
   X,
-  ArrowUpDown,
   MapPin,
   CheckCircle2,
 } from "lucide-react";
@@ -43,11 +43,10 @@ export default function EventsPage() {
   const [category, setCategory] = useState("All");
   const [city, setCity] = useState("");
   const [search, setSearch] = useState("");
-  const [priceFilter, setPriceFilter] = useState("all");
-  const [sortBy, setSortBy] = useState("date-asc");
   const [events, setEvents] = useState<EventListItem[]>([]);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+  const [totalResults, setTotalResults] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [userLoggedIn, setUserLoggedIn] = useState(false);
@@ -87,20 +86,26 @@ export default function EventsPage() {
         search,
       });
 
-      const response = await fetch(`/api/events?${params.toString()}`, {
-        credentials: "include",
-      });
+      try {
+        const response = await fetch(`/api/events?${params.toString()}`, {
+          credentials: "include",
+        });
 
-      if (!response.ok) {
+        if (!response.ok) {
+          setError("We could not load upcoming events right now.");
+          setLoading(false);
+          return;
+        }
+
+        const data = await response.json();
+        setEvents(data.events || []);
+        setTotalPages(data.totalPages || 1);
+        setTotalResults(data.total || data.events?.length || 0);
+        setLoading(false);
+      } catch {
         setError("We could not load upcoming events right now.");
         setLoading(false);
-        return;
       }
-
-      const data = await response.json();
-      setEvents(data.events || []);
-      setTotalPages(data.totalPages || 1);
-      setLoading(false);
     }
 
     void loadEvents();
@@ -112,77 +117,65 @@ export default function EventsPage() {
       return;
     }
 
-    const response = await fetch("/api/reminders", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ eventId }),
-      credentials: "include",
-    });
-
-    const data = await response.json();
-
-    if (!response.ok) {
-      setError(data.error || "Unable to save this reminder.");
-      return;
-    }
-
     const targetEvent = events.find((e) => e.id === eventId);
-    if (data.isReminder) {
-      showToast(`Reminder set for "${targetEvent?.title || "event"}"!`);
-    } else {
-      showToast(`Reminder removed.`);
-    }
+    const previousReminder = Boolean(targetEvent?.isReminder);
+    const optimisticReminder = !previousReminder;
 
     setEvents((current) =>
       current.map((event) =>
-        event.id === eventId ? { ...event, isReminder: data.isReminder } : event
+        event.id === eventId ? { ...event, isReminder: optimisticReminder } : event
       )
     );
+
+    try {
+      const response = await fetch("/api/reminders", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ eventId }),
+        credentials: "include",
+      });
+      const data = await response.json();
+
+      if (!response.ok) {
+        setEvents((current) =>
+          current.map((event) =>
+            event.id === eventId ? { ...event, isReminder: previousReminder } : event
+          )
+        );
+        showToast(data.error || "Unable to save this reminder.");
+        return;
+      }
+
+      setEvents((current) =>
+        current.map((event) =>
+          event.id === eventId ? { ...event, isReminder: data.isReminder } : event
+        )
+      );
+      showToast(
+        data.isReminder
+          ? `Reminder set for "${targetEvent?.title || "event"}"!`
+          : "Reminder removed."
+      );
+    } catch {
+      setEvents((current) =>
+        current.map((event) =>
+          event.id === eventId ? { ...event, isReminder: previousReminder } : event
+        )
+      );
+      showToast("Unable to save this reminder.");
+    }
   }
 
-  // Client-side filtering & sorting
-  const filteredEvents = useMemo(() => {
-    let result = [...events];
+  const filteredEvents = events;
+  const resultsStart = totalResults === 0 ? 0 : (page - 1) * 6 + 1;
+  const resultsEnd = totalResults === 0 ? 0 : Math.min(page * 6, totalResults);
 
-    // Price filter
-    if (priceFilter === "free") {
-      result = result.filter((e) => e.price === 0);
-    } else if (priceFilter === "under500") {
-      result = result.filter((e) => e.price > 0 && e.price <= 500);
-    } else if (priceFilter === "paid") {
-      result = result.filter((e) => e.price > 0);
-    }
-
-    // Sorting
-    result.sort((a, b) => {
-      if (sortBy === "date-asc") {
-        return new Date(a.dateTime).getTime() - new Date(b.dateTime).getTime();
-      }
-      if (sortBy === "date-desc") {
-        return new Date(b.dateTime).getTime() - new Date(a.dateTime).getTime();
-      }
-      if (sortBy === "price-asc") {
-        return a.price - b.price;
-      }
-      if (sortBy === "price-desc") {
-        return b.price - a.price;
-      }
-      if (sortBy === "title-asc") {
-        return a.title.localeCompare(b.title);
-      }
-      return 0;
-    });
-
-    return result;
-  }, [events, priceFilter, sortBy]);
-
-  const hasActiveFilters = category !== "All" || city !== "" || search !== "" || priceFilter !== "all";
+  const hasActiveFilters = category !== "All" || city !== "" || search !== "";
 
   function clearAllFilters() {
     setCategory("All");
     setCity("");
     setSearch("");
-    setPriceFilter("all");
     setPage(1);
   }
 
@@ -296,7 +289,7 @@ export default function EventsPage() {
         </div>
 
         {/* Inputs row */}
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {/* Search Input */}
           <div className="sm:col-span-2">
             <label
@@ -347,51 +340,29 @@ export default function EventsPage() {
             </div>
           </div>
 
-          {/* Price Filter */}
-          <div>
-            <label
-              className="mb-1.5 block text-xs font-semibold uppercase tracking-wider"
-              style={{ color: "var(--text-muted)" }}
-            >
-              Price Filter
-            </label>
-            <select
-              value={priceFilter}
-              onChange={(e) => setPriceFilter(e.target.value)}
-              className="form-input"
-            >
-              <option value="all">All Prices</option>
-              <option value="free">Free Events Only</option>
-              <option value="under500">Under ₹500</option>
-              <option value="paid">Paid Events</option>
-            </select>
-          </div>
         </div>
 
-        {/* Results stats & Sorting Row */}
-        <div className="flex items-center justify-between border-t border-white/5 pt-4 text-xs font-medium text-slate-400">
+        {/* Results stats */}
+        <div className="flex items-center justify-between gap-2 border-t border-white/5 pt-4 text-xs font-medium text-slate-400">
           <div className="flex items-center gap-2">
             <SlidersHorizontal size={14} />
             <span>
-              Showing <strong className="text-white">{filteredEvents.length}</strong> events
+              {totalResults > 0 ? (
+                <>
+                  Showing <strong className="text-white">{resultsStart}-{resultsEnd}</strong> of <strong className="text-white">{totalResults}</strong> matches
+                </>
+              ) : (
+                <>
+                  Showing <strong className="text-white">0</strong> matches
+                </>
+              )}
             </span>
           </div>
-
-          <div className="flex items-center gap-2">
-            <ArrowUpDown size={13} />
-            <span>Sort by:</span>
-            <select
-              value={sortBy}
-              onChange={(e) => setSortBy(e.target.value)}
-              className="bg-transparent border border-white/10 rounded-lg px-2.5 py-1 text-slate-200 outline-none"
-            >
-              <option value="date-asc" className="bg-slate-900">Date: Earliest First</option>
-              <option value="date-desc" className="bg-slate-900">Date: Latest First</option>
-              <option value="price-asc" className="bg-slate-900">Price: Low to High</option>
-              <option value="price-desc" className="bg-slate-900">Price: High to Low</option>
-              <option value="title-asc" className="bg-slate-900">Title: A to Z</option>
-            </select>
-          </div>
+          {hasActiveFilters && (
+            <span className="rounded-full border border-white/10 bg-white/5 px-2 py-1 text-[10px] uppercase tracking-[0.18em] text-slate-300">
+              Filters active
+            </span>
+          )}
         </div>
       </div>
 
@@ -402,7 +373,7 @@ export default function EventsPage() {
       {loading ? (
         <div className="events-grid">
           {[1, 2, 3, 4, 5, 6].map((i) => (
-            <div key={i} className="shimmer h-[450px] rounded-2xl" />
+            <div key={i} className="shimmer h-112.5 rounded-2xl" />
           ))}
         </div>
       ) : filteredEvents.length === 0 ? (
@@ -419,9 +390,11 @@ export default function EventsPage() {
             No events match your selected criteria
           </h2>
           <p className="mt-2 text-sm text-slate-400 max-w-md mx-auto">
-            Try resetting your filters or changing the city and search keywords.
+            {hasActiveFilters
+              ? "Try resetting your filters or changing the city and search keywords to discover more local events."
+              : "There are no upcoming events right now. Check back soon for new workshops, music nights, and local meetups."}
           </p>
-          <div className="mt-6">
+          <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
             <button
               type="button"
               onClick={clearAllFilters}
@@ -429,6 +402,9 @@ export default function EventsPage() {
             >
               Reset all filters
             </button>
+            <Link href="/my-feed" className="btn-secondary text-sm">
+              View my feed
+            </Link>
           </div>
         </div>
       ) : (

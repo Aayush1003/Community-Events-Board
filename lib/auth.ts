@@ -54,6 +54,13 @@ export async function requireAdminSession() {
 }
 
 export function getSessionFromRequest(request: Request) {
+  const authHeader = request.headers.get("authorization");
+  if (authHeader?.startsWith("Bearer ")) {
+    const bearerToken = authHeader.substring(7).trim();
+    const session = verifyToken(bearerToken);
+    if (session) return session;
+  }
+
   const cookieHeader = request.headers.get("cookie") ?? "";
   const tokenCookie = cookieHeader
     .split(";")

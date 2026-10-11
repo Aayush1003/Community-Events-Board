@@ -1,68 +1,82 @@
 # Community Events Board
 
-A polished Next.js App Router app for managing local events, browsing them as a visitor, saving favourites, and customizing event cards.
+A responsive local-events app built with the Next.js App Router, Prisma, and SQLite. Visitors can browse upcoming community events, save category preferences and reminders, and personalize an event card. Admins can create events and switch them between active and inactive.
 
-## Setup in under 5 minutes
+## Run locally
 
-1. Install dependencies
+You need Node.js and npm. No separate database server or SQLite installation is required.
 
-```bash
-npm install
-```
+1. Install dependencies:
 
-2. Generate Prisma client and initialize SQLite
+   ```bash
+   npm install
+   ```
 
-```bash
-npx prisma generate
-npx prisma db push
-npx tsx prisma/seed.ts
-```
+2. Create your local environment file:
 
-3. Start the app
+   ```powershell
+   Copy-Item .env.example .env
+   ```
 
-```bash
-npm run dev
-```
+   On macOS/Linux, use `cp .env.example .env`. For deployment, replace the example `JWT_SECRET` with a long, random value.
 
-Open http://localhost:3000
+3. Create the local SQLite database, generate the Prisma client, and add the demo data:
+
+   ```bash
+   npx prisma generate
+   npx prisma db push
+   npx tsx prisma/seed.ts
+   ```
+
+   The seed script resets the local app data before inserting 15 sample events and the demo admin, so only run it on a fresh development database or when you intend to reset that data.
+
+4. Start the development server:
+
+   ```bash
+   npm run dev
+   ```
+
+   Open [http://localhost:3000](http://localhost:3000).
+
+The SQLite file is stored at `prisma/dev.db`.
 
 ## Admin login
 
 - Email: `admin@community.com`
 - Password: `admin123`
 
-This admin is created automatically by the seed script.
+The seed script creates this account. The admin login endpoint will not create an admin account from arbitrary submitted credentials.
 
 ## API overview
 
-- `POST /api/auth/signup` — create a visitor account and set the JWT cookie
-- `POST /api/auth/login` — login and return the user session
-- `GET /api/auth/me` — fetch the current logged-in user
-- `GET /api/events` — filter active upcoming events by category, city, and text search
-- `GET /api/events/:id` — fetch one event plus reminder/card-design state for the session user
-- `GET /api/feed` — return events matching the user’s favourite categories
-- `POST /api/favourites` — save or remove favourite categories
-- `POST /api/reminders` — save or remove a reminder for a given event
-- `POST /api/card-design` — save theme and sticker selection for a user/event pair
-- `GET /api/admin/events` — admin list of all events
-- `POST /api/admin/events` — create a new event
-- `PUT /api/admin/events/:id` — toggle active/inactive status or update event data
-- `POST /api/admin/login` — admin login
+- `POST /api/auth/signup` — create a visitor account and set a JWT session cookie
+- `POST /api/auth/login` — authenticate and return a JWT plus user session
+- `POST /api/auth/logout` — clear the session cookie
+- `GET /api/auth/me` — return the current session user
+- `GET /api/events` — list upcoming active events; supports category, city, text search, and pagination together
+- `GET /api/events/:id` — return an event and the signed-in user's reminder/card design
+- `GET /api/feed` — list upcoming active events in the user's favourite categories
+- `GET/POST /api/favourites` — read or save favourite categories
+- `GET/POST /api/reminders` — list or toggle a reminder
+- `POST /api/card-design` — save an event-card theme and up to three stickers
+- `GET/POST /api/admin/events` — list or create events (admin only)
+- `PUT /api/admin/events/:id` — update event data or toggle active status (admin only)
+- `POST /api/admin/login` — authenticate the seeded admin
 
-## Notes on what is left
+## Short answers (Required 3 to 4 lines each)
 
-This implementation covers the requested app flow end-to-end and is ready for a local run and reviewer demo. No major gaps remain in the core assignment requirements.
+### 1. Show your database structure. Why did you design it this way?
+The schema uses SQLite via Prisma with 5 models: `User` (credentials, role), `Event` (title, category, city, dateTime, price, description, imageUrl, isActive), `UserFavourite` (category preference join table), `Reminder` (event reminder join table), and `CardDesign` (customized theme and JSON sticker array per user-event). We normalized user-event relationships using dedicated relation tables with composite unique constraints (`@@unique([userId, eventId])`, `@@unique([userId, category])`) and cascade deletes, ensuring data integrity, preventing duplicate bookmarks/reminders, and allowing high concurrency without mutating core event records.
 
-## Short answers
+### 2. How does your filter query work, and what index would you add?
+The `/api/events` route builds a composite Prisma `where` clause combining `isActive: true`, `dateTime: { gte: now }`, exact `category` match, case-insensitive `city` filter, and an `OR` condition searching across `title` and `description`, returned with offset pagination (`skip`, `take`). In SQLite/Prisma, we added composite indexes `@@index([isActive, dateTime])` and `@@index([category, city])` to make the active-upcoming filter and category/city lookups instantaneous; for high-volume production databases, we would add an FTS5 full-text index (or PostgreSQL GIN trigram index) on `title` and `description` to optimize substring search without table scans.
 
-### On AI tools
+### 3. How do you store passwords and protect the admin pages and APIs?
+Passwords are salted and hashed using `bcrypt` (10 rounds) before persisting, and plain-text passwords are never logged or stored. Server-side admin pages (`/admin/events`) enforce access using `requireAdminSession()` in the Server Component layer, redirecting unauthenticated or non-admin requests before page rendering; admin APIs (`/api/admin/*`) verify cryptographically signed JWT tokens passed via HTTP-only cookies or `Authorization: Bearer <token>` headers and check `role === "ADMIN"`, returning HTTP 401 Unauthorized for invalid sessions.
 
-I used AI assistance for scaffolding, debugging Prisma/Next integration issues, and improving the code structure. I reviewed every generated line and adjusted the implementation to match the assignment requirements and the project’s exact runtime needs.
+### 4. On AI tools: Where they were used
+AI tools were used during initial project setup to generate boilerplate structure, draft the responsive CSS variables, format the 15 realistic seed events, and cross-reference feature completeness against the specification checklist. All business logic—including server-side authentication guards, optimistic UI updates with error rollback, filter composition, and database constraints—was reviewed and tested for correctness.
 
-### On architecture choice
+## Remaining submission work
 
-I used Next.js App Router with Prisma + SQLite because it keeps the app lightweight, fast to set up, and easy to extend. The API layer is clear and reusable for a future mobile client while the UI remains polished and responsive for both desktop and mobile screens.
-
-### On quality and testing
-
-I focused on responsive UI states, consistent styling, and realistic sample data so the app feels complete during review. I also validated the production build and local server flow to make sure the required pages and APIs run correctly.
+Record the requested 3–4 minute screen demonstration showing both phone-size screen (e.g. Chrome DevTools Device Mode 390px) and laptop screen, explaining two or three choices you made in your code in your own words. Then push your branch to GitHub.

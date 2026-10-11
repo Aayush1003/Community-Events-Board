@@ -1,12 +1,12 @@
 "use client";
 
+import Image from "next/image";
 import { type FormEvent, useEffect, useState, useMemo } from "react";
 import {
   PlusCircle,
   LayoutList,
   ToggleLeft,
   ToggleRight,
-  Trash2,
   Search,
   Sparkles,
   Calendar,
@@ -84,10 +84,19 @@ export default function AdminEventsView() {
 
         if (!isMounted) return;
 
+        if (!response.ok) {
+          setError(data.error || "Unable to load events.");
+          setLoading(false);
+          return;
+        }
+
         setEvents(data.events || []);
         setLoading(false);
       } catch {
-        if (isMounted) setLoading(false);
+        if (isMounted) {
+          setError("Unable to load events. Check your connection and try again.");
+          setLoading(false);
+        }
       }
     }
 
@@ -138,44 +147,27 @@ export default function AdminEventsView() {
       current.map((item) => (item.id === eventId ? { ...item, isActive: nextState } : item))
     );
 
-    const response = await fetch(`/api/admin/events/${eventId}`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ isActive: nextState }),
-      credentials: "include",
-    });
-
-    if (!response.ok) {
-      setError("Could not update event status.");
-      // Rollback
-      setEvents((current) =>
-        current.map((item) => (item.id === eventId ? { ...item, isActive: !nextState } : item))
-      );
-    } else {
-      showToast(`Event marked as ${nextState ? "Active" : "Inactive"}.`);
-    }
-  }
-
-  async function deleteEvent(eventId: string, title: string) {
-    if (!window.confirm(`Are you sure you want to permanently delete "${title}"?`)) {
-      return;
-    }
-
     try {
       const response = await fetch(`/api/admin/events/${eventId}`, {
-        method: "DELETE",
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ isActive: nextState }),
         credentials: "include",
       });
 
       if (!response.ok) {
-        showToast("Unable to delete event.");
-        return;
+        setError("Could not update event status.");
+        setEvents((current) =>
+          current.map((item) => (item.id === eventId ? { ...item, isActive: !nextState } : item))
+        );
+      } else {
+        showToast(`Event marked as ${nextState ? "Active" : "Inactive"}.`);
       }
-
-      setEvents((current) => current.filter((item) => item.id !== eventId));
-      showToast(`Deleted "${title}".`);
     } catch {
-      showToast("Error deleting event.");
+      setError("Could not update event status. Check your connection and try again.");
+      setEvents((current) =>
+        current.map((item) => (item.id === eventId ? { ...item, isActive: !nextState } : item))
+      );
     }
   }
 
@@ -395,12 +387,15 @@ export default function AdminEventsView() {
               {/* Live Image Preview */}
               {form.imageUrl && (
                 <div className="mt-2 relative h-28 w-full overflow-hidden rounded-xl border border-white/10">
-                  <img
+                  <Image
                     src={form.imageUrl}
                     alt="Preview"
-                    className="h-full w-full object-cover"
-                    onError={(e) => {
-                      (e.target as HTMLElement).style.display = "none";
+                    fill
+                    sizes="(max-width: 640px) 100vw, 400px"
+                    unoptimized
+                    className="object-cover"
+                    onError={(event) => {
+                      event.currentTarget.style.display = "none";
                     }}
                   />
                   <span className="absolute bottom-1 right-2 text-[10px] bg-black/70 px-1.5 py-0.5 rounded text-white font-mono">
@@ -516,9 +511,12 @@ export default function AdminEventsView() {
                 >
                   {/* Left: Thumbnail & Details */}
                   <div className="flex items-center gap-4">
-                    <img
+                    <Image
                       src={item.imageUrl}
                       alt={item.title}
+                      width={64}
+                      height={64}
+                      unoptimized
                       className="h-16 w-16 rounded-xl object-cover shrink-0"
                     />
 
@@ -581,15 +579,6 @@ export default function AdminEventsView() {
                       )}
                     </button>
 
-                    <button
-                      type="button"
-                      onClick={() => deleteEvent(item.id, item.title)}
-                      className="flex h-8 w-8 items-center justify-center rounded-xl bg-rose-500/10 text-rose-400 hover:bg-rose-500/20 border border-rose-500/20 transition-all"
-                      title="Delete event"
-                      aria-label="Delete event"
-                    >
-                      <Trash2 size={14} />
-                    </button>
                   </div>
                 </div>
               ))}

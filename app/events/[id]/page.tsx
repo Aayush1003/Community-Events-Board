@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import {
@@ -9,12 +10,8 @@ import {
   Sparkles,
   ArrowLeft,
   Bell,
-  Share2,
-  CalendarPlus,
-  Check,
   CheckCircle2,
   Smile,
-  Type,
 } from "lucide-react";
 import Link from "next/link";
 import { formatDateTime, formatPrice } from "@/lib/format";
@@ -40,22 +37,18 @@ const themes = [
   { label: "Sunset Glow", value: "sunset", className: "from-orange-400 via-pink-400 to-rose-300", textColor: "text-slate-900" },
   { label: "Ocean Breeze", value: "ocean", className: "from-cyan-300 via-sky-300 to-indigo-300", textColor: "text-slate-900" },
   { label: "Neon Cyber", value: "cyber", className: "from-purple-900 via-indigo-900 to-slate-950", textColor: "text-purple-100" },
-  { label: "Emerald Meadow", value: "forest", className: "from-emerald-400 via-teal-300 to-lime-200", textColor: "text-slate-900" },
-  { label: "Golden Hour", value: "gold", className: "from-amber-400 via-orange-300 to-yellow-200", textColor: "text-slate-900" },
 ];
 
-const availableStickers = ["🎉", "🎵", "🌟", "✨", "🍕", "🎸", "☕", "🎨", "🎟️", "🔥", "🚀", "🎈"];
+const availableStickers = ["🎉", "🎵", "🌟", "🍕", "🎨"];
 
 export default function EventDetailPage() {
   const params = useParams();
   const [event, setEvent] = useState<EventDetail | null>(null);
   const [theme, setTheme] = useState("sunset");
   const [selectedStickers, setSelectedStickers] = useState<string[]>([]);
-  const [customNote, setCustomNote] = useState("Can't wait for this!");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
-  const [copied, setCopied] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   function showToast(msg: string) {
@@ -80,8 +73,18 @@ export default function EventDetailPage() {
         }
 
         setEvent(data);
-        setTheme(data.cardDesign?.theme || "sunset");
-        setSelectedStickers(data.cardDesign?.stickers || []);
+        setTheme(
+          themes.some((item) => item.value === data.cardDesign?.theme)
+            ? data.cardDesign.theme
+            : "sunset"
+        );
+        setSelectedStickers(
+          Array.isArray(data.cardDesign?.stickers)
+            ? data.cardDesign.stickers
+                .filter((sticker: string) => availableStickers.includes(sticker))
+                .slice(0, 3)
+            : []
+        );
         setLoading(false);
       } catch {
         setError("Unable to load event details.");
@@ -111,17 +114,28 @@ export default function EventDetailPage() {
       setSaving(false);
 
       if (!response.ok) {
-        showToast("Log in to save your customized card design to your profile.");
+        showToast(
+          response.status === 401
+            ? "Log in to save your customized card design."
+            : "Unable to save your card design. Please try again."
+        );
       } else {
         showToast("Custom card design saved!");
       }
     } catch {
       setSaving(false);
+      showToast("Unable to save your card design. Please try again.");
     }
   }
 
   async function toggleReminder() {
     if (!event) return;
+
+    const previousReminder = Boolean(event.isReminder);
+    const optimisticReminder = !previousReminder;
+    setEvent((current) =>
+      current ? { ...current, isReminder: optimisticReminder } : null
+    );
 
     try {
       const response = await fetch("/api/reminders", {
@@ -133,6 +147,9 @@ export default function EventDetailPage() {
 
       const data = await response.json();
       if (!response.ok) {
+        setEvent((current) =>
+          current ? { ...current, isReminder: previousReminder } : null
+        );
         showToast(data.error || "Please log in to set event reminders.");
         return;
       }
@@ -140,16 +157,10 @@ export default function EventDetailPage() {
       setEvent((current) => (current ? { ...current, isReminder: data.isReminder } : null));
       showToast(data.isReminder ? "Added to your reminders!" : "Removed from reminders.");
     } catch {
+      setEvent((current) =>
+        current ? { ...current, isReminder: previousReminder } : null
+      );
       showToast("Unable to update reminder.");
-    }
-  }
-
-  async function handleShare() {
-    if (navigator.clipboard) {
-      await navigator.clipboard.writeText(window.location.href);
-      setCopied(true);
-      showToast("Event link copied to clipboard!");
-      setTimeout(() => setCopied(false), 2500);
     }
   }
 
@@ -159,8 +170,8 @@ export default function EventDetailPage() {
   }
 
   function handleAddSticker(emoji: string) {
-    if (selectedStickers.length >= 4) {
-      showToast("Max 4 stickers on card.");
+    if (selectedStickers.length >= 3) {
+      showToast("You can add up to 3 stickers.");
       return;
     }
     const next = [...selectedStickers, emoji];
@@ -174,27 +185,17 @@ export default function EventDetailPage() {
     void saveDesign(theme, next);
   }
 
-  // Google Calendar URL generator
-  function getGoogleCalendarUrl() {
-    if (!event) return "#";
-    const startDate = new Date(event.dateTime);
-    const endDate = new Date(startDate.getTime() + 2 * 60 * 60 * 1000); // 2 hours
-    const formatGDate = (d: Date) => d.toISOString().replace(/-|:|\.\d\d\d/g, "");
-    const title = encodeURIComponent(event.title);
-    const details = encodeURIComponent(
-      `${event.description}\n\nCity: ${event.city}\nPrice: ${formatPrice(event.price)}`
-    );
-    const location = encodeURIComponent(event.city);
-    return `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${title}&details=${details}&location=${location}&dates=${formatGDate(
-      startDate
-    )}/${formatGDate(endDate)}`;
+  function resetDesign() {
+    setTheme("sunset");
+    setSelectedStickers([]);
+    void saveDesign("sunset", []);
   }
 
   if (loading) {
     return (
       <div className="detail-layout">
-        <div className="shimmer h-[620px] rounded-3xl" />
-        <div className="shimmer h-[520px] rounded-3xl" />
+        <div className="shimmer h-155 rounded-3xl" />
+        <div className="shimmer h-130 rounded-3xl" />
       </div>
     );
   }
@@ -216,7 +217,7 @@ export default function EventDetailPage() {
   return (
     <div className="space-y-6 animate-fade-in-up">
       {/* Navigation bar */}
-      <div className="flex items-center justify-between">
+      <div>
         <Link
           href="/events"
           className="inline-flex items-center gap-2 text-sm font-semibold transition-colors text-slate-400 hover:text-white"
@@ -224,28 +225,6 @@ export default function EventDetailPage() {
           <ArrowLeft size={16} />
           Back to all events
         </Link>
-
-        {/* Share & Calendar Buttons */}
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={handleShare}
-            className="btn-secondary text-xs py-2 px-3.5 rounded-xl flex items-center gap-1.5"
-          >
-            {copied ? <Check size={14} className="text-emerald-400" /> : <Share2 size={14} />}
-            <span>{copied ? "Link Copied" : "Share"}</span>
-          </button>
-
-          <a
-            href={getGoogleCalendarUrl()}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="btn-secondary text-xs py-2 px-3.5 rounded-xl flex items-center gap-1.5"
-          >
-            <CalendarPlus size={14} style={{ color: "var(--accent-orange)" }} />
-            <span>Add to Google Cal</span>
-          </a>
-        </div>
       </div>
 
       <div className="detail-layout">
@@ -253,10 +232,13 @@ export default function EventDetailPage() {
         <div className="glass-card overflow-hidden rounded-3xl shadow-2xl">
           {/* Banner Hero Image */}
           <div className="relative h-96 w-full overflow-hidden bg-slate-900">
-            <img
+            <Image
               src={event.imageUrl}
               alt={event.title}
-              className="h-full w-full object-cover"
+              fill
+              sizes="(max-width: 1024px) 100vw, 60vw"
+              unoptimized
+              className="object-cover"
             />
             <div
               className="absolute inset-0"
@@ -395,7 +377,7 @@ export default function EventDetailPage() {
                   key={item.value}
                   type="button"
                   onClick={() => handleThemeChange(item.value)}
-                  className={`h-10 w-10 rounded-xl bg-gradient-to-br ${item.className} transition-all duration-200`}
+                  className={`h-10 w-10 rounded-xl bg-linear-to-br ${item.className} transition-all duration-200`}
                   style={{
                     border: theme === item.value ? "3px solid #ffffff" : "2px solid transparent",
                     transform: theme === item.value ? "scale(1.12)" : "scale(1)",
@@ -410,11 +392,18 @@ export default function EventDetailPage() {
 
           {/* Stickers Tray */}
           <div>
-            <div className="flex items-center justify-between mb-2">
-              <p className="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+            <div className="mb-2 flex items-center justify-between gap-3">
+              <p className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-slate-400">
                 <Smile size={13} />
-                Add Stickers ({selectedStickers.length}/4)
+                Add Stickers ({selectedStickers.length}/3)
               </p>
+              <button
+                type="button"
+                onClick={resetDesign}
+                className="text-[11px] font-semibold text-slate-300 transition-colors hover:text-white"
+              >
+                Reset design
+              </button>
             </div>
             <div className="flex flex-wrap gap-2">
               {availableStickers.map((emoji) => (
@@ -422,10 +411,11 @@ export default function EventDetailPage() {
                   key={emoji}
                   type="button"
                   onClick={() => handleAddSticker(emoji)}
-                  className="flex h-10 w-10 items-center justify-center rounded-xl text-lg transition-transform hover:scale-115"
+                  className="flex h-10 w-10 items-center justify-center rounded-xl text-lg transition-transform hover:scale-110"
                   style={{
                     background: "rgba(255,255,255,0.05)",
                     border: "1px solid var(--glass-border)",
+                    opacity: selectedStickers.includes(emoji) ? 0.55 : 1,
                   }}
                   title={`Add ${emoji}`}
                 >
@@ -435,31 +425,16 @@ export default function EventDetailPage() {
             </div>
           </div>
 
-          {/* Custom Greeting Input */}
-          <div>
-            <p className="mb-2 text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
-              <Type size={13} />
-              Custom Note
-            </p>
-            <input
-              value={customNote}
-              onChange={(e) => setCustomNote(e.target.value)}
-              placeholder="e.g. See you there! or Going with team!"
-              maxLength={35}
-              className="form-input text-xs"
-            />
-          </div>
-
           {/* Live Card Pass Preview */}
           <div>
             <p className="mb-2 text-xs font-bold uppercase tracking-wider text-slate-400">
               Your Pass Preview
             </p>
             <div
-              className={`relative overflow-hidden rounded-2xl bg-gradient-to-br ${selectedTheme.className} p-6 shadow-2xl transition-all duration-500`}
+              className={`relative overflow-hidden rounded-2xl bg-linear-to-br ${selectedTheme.className} p-6 shadow-2xl transition-all duration-500`}
               style={{ border: "1px solid rgba(255,255,255,0.3)" }}
             >
-              <div className="relative z-10 flex min-h-[200px] flex-col justify-between">
+              <div className="relative z-10 flex min-h-50 flex-col justify-between">
                 <div className="flex items-center justify-between text-xs font-extrabold uppercase tracking-wider opacity-85">
                   <span className={selectedTheme.textColor}>{event.city}</span>
                   <span
@@ -479,17 +454,10 @@ export default function EventDetailPage() {
                   <p className={`mt-1 text-xs font-medium opacity-80 ${selectedTheme.textColor}`}>
                     {formatDateTime(event.dateTime)}
                   </p>
-                  {customNote && (
-                    <p
-                      className={`mt-2 text-xs italic font-semibold ${selectedTheme.textColor} opacity-90`}
-                    >
-                      &quot;{customNote}&quot;
-                    </p>
-                  )}
                 </div>
 
                 {/* Stickers row */}
-                <div className="flex min-h-[40px] items-center gap-2 text-2xl pt-2">
+                <div className="flex min-h-10 items-center gap-2 text-2xl pt-2">
                   {selectedStickers.length === 0 ? (
                     <span className="text-xs opacity-60">Tap stickers above to decorate</span>
                   ) : (
