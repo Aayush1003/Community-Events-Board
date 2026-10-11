@@ -185,6 +185,12 @@ export default function EventDetailPage() {
     void saveDesign(theme, next);
   }
 
+  function resetDesign() {
+    setTheme("sunset");
+    setSelectedStickers([]);
+    void saveDesign("sunset", []);
+  }
+
   if (loading) {
     return (
       <div className="detail-layout">
@@ -386,11 +392,18 @@ export default function EventDetailPage() {
 
           {/* Stickers Tray */}
           <div>
-            <div className="flex items-center justify-between mb-2">
-              <p className="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+            <div className="mb-2 flex items-center justify-between gap-3">
+              <p className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-slate-400">
                 <Smile size={13} />
                 Add Stickers ({selectedStickers.length}/3)
               </p>
+              <button
+                type="button"
+                onClick={resetDesign}
+                className="text-[11px] font-semibold text-slate-300 transition-colors hover:text-white"
+              >
+                Reset design
+              </button>
             </div>
             <div className="flex flex-wrap gap-2">
               {availableStickers.map((emoji) => (
@@ -398,10 +411,11 @@ export default function EventDetailPage() {
                   key={emoji}
                   type="button"
                   onClick={() => handleAddSticker(emoji)}
-                  className="flex h-10 w-10 items-center justify-center rounded-xl text-lg transition-transform hover:scale-115"
+                  className="flex h-10 w-10 items-center justify-center rounded-xl text-lg transition-transform hover:scale-110"
                   style={{
                     background: "rgba(255,255,255,0.05)",
                     border: "1px solid var(--glass-border)",
+                    opacity: selectedStickers.includes(emoji) ? 0.55 : 1,
                   }}
                   title={`Add ${emoji}`}
                 >

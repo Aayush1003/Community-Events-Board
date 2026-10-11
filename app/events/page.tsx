@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import {
   Search,
   SlidersHorizontal,
@@ -45,6 +46,7 @@ export default function EventsPage() {
   const [events, setEvents] = useState<EventListItem[]>([]);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+  const [totalResults, setTotalResults] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [userLoggedIn, setUserLoggedIn] = useState(false);
@@ -98,6 +100,7 @@ export default function EventsPage() {
         const data = await response.json();
         setEvents(data.events || []);
         setTotalPages(data.totalPages || 1);
+        setTotalResults(data.total || data.events?.length || 0);
         setLoading(false);
       } catch {
         setError("We could not load upcoming events right now.");
@@ -164,6 +167,8 @@ export default function EventsPage() {
   }
 
   const filteredEvents = events;
+  const resultsStart = totalResults === 0 ? 0 : (page - 1) * 6 + 1;
+  const resultsEnd = totalResults === 0 ? 0 : Math.min(page * 6, totalResults);
 
   const hasActiveFilters = category !== "All" || city !== "" || search !== "";
 
@@ -338,13 +343,26 @@ export default function EventsPage() {
         </div>
 
         {/* Results stats */}
-        <div className="flex items-center justify-between border-t border-white/5 pt-4 text-xs font-medium text-slate-400">
+        <div className="flex items-center justify-between gap-2 border-t border-white/5 pt-4 text-xs font-medium text-slate-400">
           <div className="flex items-center gap-2">
             <SlidersHorizontal size={14} />
             <span>
-              Showing <strong className="text-white">{filteredEvents.length}</strong> events on this page
+              {totalResults > 0 ? (
+                <>
+                  Showing <strong className="text-white">{resultsStart}-{resultsEnd}</strong> of <strong className="text-white">{totalResults}</strong> matches
+                </>
+              ) : (
+                <>
+                  Showing <strong className="text-white">0</strong> matches
+                </>
+              )}
             </span>
           </div>
+          {hasActiveFilters && (
+            <span className="rounded-full border border-white/10 bg-white/5 px-2 py-1 text-[10px] uppercase tracking-[0.18em] text-slate-300">
+              Filters active
+            </span>
+          )}
         </div>
       </div>
 
@@ -372,9 +390,11 @@ export default function EventsPage() {
             No events match your selected criteria
           </h2>
           <p className="mt-2 text-sm text-slate-400 max-w-md mx-auto">
-            Try resetting your filters or changing the city and search keywords.
+            {hasActiveFilters
+              ? "Try resetting your filters or changing the city and search keywords to discover more local events."
+              : "There are no upcoming events right now. Check back soon for new workshops, music nights, and local meetups."}
           </p>
-          <div className="mt-6">
+          <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
             <button
               type="button"
               onClick={clearAllFilters}
@@ -382,6 +402,9 @@ export default function EventsPage() {
             >
               Reset all filters
             </button>
+            <Link href="/my-feed" className="btn-secondary text-sm">
+              View my feed
+            </Link>
           </div>
         </div>
       ) : (
